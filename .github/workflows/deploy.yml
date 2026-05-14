@@ -1,0 +1,29 @@
+name: Frontend Deploy to AWS
+on:
+  push:
+    branches: [ "deploy" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del codigo
+        uses: actions/checkout@v4
+
+      - name: Build y Push a Docker Hub
+        run: |
+          echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
+          docker build -t ${{ secrets.DOCKER_USER }}/frontend-innovatech ./frontend
+          docker push ${{ secrets.DOCKER_USER }}/frontend-innovatech
+
+      - name: Despliegue en EC2 via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_IP }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            docker pull ${{ secrets.DOCKER_USER }}/frontend-innovatech
+            docker stop frontend || true
+            docker rm frontend || true
+            docker run -d --name frontend -p 80:80 ${{ secrets.DOCKER_USER }}/frontend-innovatech
